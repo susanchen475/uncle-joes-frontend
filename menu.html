@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Menu - Uncle Joe's Coffee Club</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Uncle Joe's Coffee Club</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="menu.html">Menu</a>
+      <a href="locations.html">Locations</a>
+    </nav>
+  </header>
+
+  <main>
+    <h2>Menu</h2>
+
+    <div class="card">
+      <input type="text" id="searchInput" placeholder="Search menu items..." />
+      <button onclick="loadMenu()">Search</button>
+      <button onclick="resetMenu()">Reset</button>
+    </div>
+
+    <div id="status"></div>
+    <div id="menuContainer"></div>
+  </main>
+
+  <script>
+    const API_BASE = "https://uncle-joes-api-556060884056.us-central1.run.app";
+
+    function groupByCategory(items) {
+      const grouped = {};
+      items.forEach(item => {
+        const category = item.category || "Other";
+        if (!grouped[category]) grouped[category] = [];
+        grouped[category].push(item);
+      });
+      return grouped;
+    }
+
+    async function loadMenu() {
+      const status = document.getElementById("status");
+      const container = document.getElementById("menuContainer");
+      const keyword = document.getElementById("searchInput").value.trim();
+
+      status.innerHTML = '<div class="loading">Loading menu...</div>';
+      container.innerHTML = "";
+
+      let url = `${API_BASE}/menu`;
+      if (keyword) {
+        url = `${API_BASE}/menu/search?item_name=${encodeURIComponent(keyword)}`;
+      }
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Failed to load menu data.");
+        const data = await response.json();
+
+        status.innerHTML = "";
+
+        if (!data.length) {
+          status.innerHTML = '<div class="empty">No menu items found.</div>';
+          return;
+        }
+
+        const grouped = groupByCategory(data);
+
+        Object.keys(grouped).sort().forEach(category => {
+          const section = document.createElement("section");
+          section.className = "category-section";
+
+          const heading = document.createElement("h3");
+          heading.className = "category-title";
+          heading.textContent = category;
+          section.appendChild(heading);
+
+          const grid = document.createElement("div");
+          grid.className = "grid";
+
+          grouped[category].forEach(item => {
+            const card = document.createElement("div");
+            card.className = "card";
+            card.innerHTML = `
+              <h3>${item.name}</h3>
+              <p><strong>Category:</strong> ${item.category}</p>
+              <p><strong>Size:</strong> ${item.size}</p>
+              <p><strong>Calories:</strong> ${item.calories}</p>
+              <p><strong>Price:</strong> $${Number(item.price).toFixed(2)}</p>
+              <p class="small"><strong>ID:</strong> ${item.id}</p>
+            `;
+            grid.appendChild(card);
+          });
+
+          section.appendChild(grid);
+          container.appendChild(section);
+        });
+      } catch (error) {
+        status.innerHTML = `<div class="error">${error.message}</div>`;
+      }
+    }
+
+    function resetMenu() {
+      document.getElementById("searchInput").value = "";
+      loadMenu();
+    }
+
+    loadMenu();
+  </script>
+</body>
+</html>

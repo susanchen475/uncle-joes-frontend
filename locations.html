@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Locations - Uncle Joe's Coffee Club</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Uncle Joe's Coffee Club</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="menu.html">Menu</a>
+      <a href="locations.html">Locations</a>
+    </nav>
+  </header>
+
+  <main>
+    <h2>Locations</h2>
+
+    <div class="card">
+      <input type="text" id="stateInput" placeholder="Filter by state (ex: IN)" />
+      <button onclick="loadLocations()">Search</button>
+      <button onclick="resetLocations()">Reset</button>
+      <p class="small">Tip: enter a two-letter state abbreviation to narrow results.</p>
+    </div>
+
+    <div id="status"></div>
+    <div id="locationsContainer" class="grid"></div>
+  </main>
+
+  <script>
+    const API_BASE = "https://uncle-joes-api-556060884056.us-central1.run.app";
+
+    function formatTime(value) {
+      if (value === null || value === undefined || value === "") return "Closed";
+
+      const raw = String(value).trim();
+      if (!/^\d+$/.test(raw)) return raw;
+
+      let padded = raw.padStart(4, "0");
+      let hours = parseInt(padded.slice(0, 2), 10);
+      let minutes = parseInt(padded.slice(2, 4), 10);
+
+      if (Number.isNaN(hours) || Number.isNaN(minutes)) return raw;
+      if (minutes < 0 || minutes > 59 || hours < 0 || hours > 23) return raw;
+
+      const suffix = hours >= 12 ? "PM" : "AM";
+      let displayHour = hours % 12;
+      if (displayHour === 0) displayHour = 12;
+
+      return `${displayHour}:${String(minutes).padStart(2, "0")} ${suffix}`;
+    }
+
+    function buildHoursHTML(loc) {
+      const days = [
+        ["Monday", loc.hours_monday_open, loc.hours_monday_close],
+        ["Tuesday", loc.hours_tuesday_open, loc.hours_tuesday_close],
+        ["Wednesday", loc.hours_wednesday_open, loc.hours_wednesday_close],
+        ["Thursday", loc.hours_thursday_open, loc.hours_thursday_close],
+        ["Friday", loc.hours_friday_open, loc.hours_friday_close],
+        ["Saturday", loc.hours_saturday_open, loc.hours_saturday_close],
+        ["Sunday", loc.hours_sunday_open, loc.hours_sunday_close]
+      ];
+
+      const hoursList = days.map(([day, open, close]) => {
+        const openMissing = open === null || open === undefined || open === "";
+        const closeMissing = close === null || close === undefined || close === "";
+
+        let display;
+        if (openMissing && closeMissing) {
+          display = "Closed";
+        } else {
+          display = `${formatTime(open)} - ${formatTime(close)}`;
+        }
+
+        return `<li><strong>${day}:</strong> ${display}</li>`;
+      }).join("");
+
+      return `
+        <div class="hours-block">
+          <p><strong>Hours:</strong></p>
+          <ul class="hours-list">
+            ${hoursList}
+          </ul>
+        </div>
+      `;
+    }
+
+    async function loadLocations() {
+      const status = document.getElementById("status");
+      const container = document.getElementById("locationsContainer");
+      const state = document.getElementById("stateInput").value.trim();
+
+      status.innerHTML = '<div class="loading">Loading locations...</div>';
+      container.innerHTML = "";
+
+      let url = `${API_BASE}/locations`;
+      if (state) {
+        url = `${API_BASE}/locations/filter/${encodeURIComponent(state)}`;
+      }
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Failed to load location data.");
+        const data = await response.json();
+
+        status.innerHTML = "";
+
+        if (!data.length) {
+          status.innerHTML = '<div class="empty">No locations found.</div>';
+          return;
+        }
+
+        data.forEach(loc => {
+          const card = document.createElement("div");
+          card.className = "card";
+          card.innerHTML = `
+            <h3>${loc.city}, ${loc.state}</h3>
+            <p><strong>Address:</strong> ${loc.address_one || "N/A"}</p>
+            <p><strong>Phone:</strong> ${loc.phone_number || "N/A"}</p>
+            <p><strong>Email:</strong> ${loc.email || "N/A"}</p>
+            <p><strong>Open for Business:</strong> ${loc.open_for_business}</p>
+            ${buildHoursHTML(loc)}
+            <p class="small"><strong>ID:</strong> ${loc.id}</p>
+          `;
+          container.appendChild(card);
+        });
+      } catch (error) {
+        status.innerHTML = `<div class="error">${error.message}</div>`;
+      }
+    }
+
+    function resetLocations() {
+      document.getElementById("stateInput").value = "";
+      loadLocations();
+    }
+
+    loadLocations();
+  </script>
+</body>
+</html>
