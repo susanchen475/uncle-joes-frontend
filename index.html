@@ -13,6 +13,7 @@
       <a href="index.html">Home</a>
       <a href="menu.html">Menu</a>
       <a href="locations.html">Locations</a>
+      <a href="login.html" id="nav-login">Login</a>
     </nav>
   </header>
 
@@ -34,7 +35,23 @@
         <p class="small">Browse store locations by city and state using live backend data.</p>
         <a href="locations.html"><button>Open Locations</button></a>
       </div>
+      
+      <div class="card">
+        <h2>Coffee Club</h2>
+        <p class="small">Log in to view your order history and check your points balance.</p>
+        <a href="login.html"><button>Member Login</button></a>
+      </div>
     </div>
   </main>
+  
+  <script>
+    if (sessionStorage.getItem('member_id')) {
+        const loginLink = document.getElementById('nav-login');
+        if (loginLink) {
+            loginLink.href = 'dashboard.html';
+            loginLink.innerText = 'Dashboard';
+        }
+    }
+  </script>
 </body>
 </html>
