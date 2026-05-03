@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Member Dashboard - Uncle Joe's</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .dashboard-container { max-width: 800px; margin: 40px auto; padding: 20px; }
+        .points-card { background: #f4f4f4; padding: 20px; text-align: center; border-radius: 8px; margin-bottom: 30px; }
+        .points-card h2 { margin: 0; color: #2c3e50; font-size: 2em; }
+        .order-card { border: 1px solid #ddd; margin-bottom: 15px; padding: 15px; border-radius: 5px; }
+        .order-header { display: flex; justify-content: space-between; font-weight: bold; cursor: pointer; }
+        .order-details { margin-top: 15px; padding-top: 15px; border-top: 1px dashed #ccc; display: none; }
+        .line-item { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="index.html">Home</a> | 
+        <a href="menu.html">Menu</a> | 
+        <a href="locations.html">Locations</a> | 
+        <button onclick="logout()">Log Out</button>
+    </nav>
+
+    <div class="dashboard-container">
+        <h1>Welcome to your Dashboard</h1>
+        
+        <div class="points-card">
+            <p>Your Coffee Club Balance</p>
+            <h2 id="points-display">Loading...</h2>
+        </div>
+
+        <h3>Your Past Orders</h3>
+        <div id="orders-container">
+            <p>Loading your order history...</p>
+        </div>
+    </div>
+
+    <script>
+        // 
+        const API_BASE_URL = "https://uncle-joes-frontend-556060884056.us-central1.run.app"; 
+
+        // 1. Authentication Check
+        const memberId = sessionStorage.getItem('member_id');
+        if (!memberId) {
+            // If they aren't logged in, send them back to the login page
+            window.location.href = 'login.html';
+        }
+
+        // Logout function
+        function logout() {
+            sessionStorage.removeItem('member_id');
+            window.location.href = 'login.html';
+        }
+
+        // 2. Fetch and Display Points
+        async function loadPoints() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/members/${memberId}/points`);
+                const data = await response.json();
+                document.getElementById('points-display').innerText = `${data.loyalty_points} Points`;
+            } catch (error) {
+                console.error("Error loading points:", error);
+                document.getElementById('points-display').innerText = "Unavailable";
+            }
+        }
+
+        // 3. Fetch and Display Orders
+        async function loadOrders() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/members/${memberId}/orders`);
+                const rawData = await response.json();
+                const container = document.getElementById('orders-container');
+                container.innerHTML = ''; // Clear loading text
+
+                if (rawData.length === 0) {
+                    container.innerHTML = '<p>You have no past orders.</p>';
+                    return;
+                }
+
+                // Group the flattened SQL rows by order_id
+                const groupedOrders = {};
+                rawData.forEach(row => {
+                    if (!groupedOrders[row.order_id]) {
+                        groupedOrders[row.order_id] = {
+                            date: new Date(row.order_date).toLocaleDateString(),
+                            location: `${row.city}, ${row.state}`,
+                            total: row.order_total,
+                            items: []
+                        };
+                    }
+                    groupedOrders[row.order_id].items.push({
+                        name: row.item_name,
+                        size: row.size,
+                        quantity: row.quantity,
+                        price: row.price
+                    });
+                });
+
+                // Build the HTML for each grouped order
+                for (const orderId in groupedOrders) {
+                    const order = groupedOrders[orderId];
+                    
+                    let itemsHtml = '';
+                    order.items.forEach(item => {
+                        itemsHtml += `
+                            <div class="line-item">
+                                <span>${item.quantity}x ${item.size} ${item.name}</span>
+                                <span>$${item.price.toFixed(2)}</span>
+                            </div>
+                        `;
+                    });
+
+                    const orderCard = document.createElement('div');
+                    orderCard.className = 'order-card';
+                    orderCard.innerHTML = `
+                        <div class="order-header" onclick="toggleDetails('${orderId}')">
+                            <span>${order.date} - ${order.location}</span>
+                            <span>$${order.total.toFixed(2)} ▼</span>
+                        </div>
+                        <div class="order-details" id="details-${orderId}">
+                            ${itemsHtml}
+                        </div>
+                    `;
+                    container.appendChild(orderCard);
+                }
+            } catch (error) {
+                console.error("Error loading orders:", error);
+                document.getElementById('orders-container').innerHTML = '<p>Error loading order history.</p>';
+            }
+        }
+
+        // Utility to show/hide the line items when clicking an order
+        function toggleDetails(orderId) {
+            const detailsDiv = document.getElementById(`details-${orderId}`);
+            if (detailsDiv.style.display === 'block') {
+                detailsDiv.style.display = 'none';
+            } else {
+                detailsDiv.style.display = 'block';
+            }
+        }
+
+        // Run the fetch functions when the page loads
+        loadPoints();
+        loadOrders();
+    </script>
+</body>
+</html>
