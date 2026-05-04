@@ -30,85 +30,97 @@
   </main>
 
   <script>
-    const API_BASE = "https://uncle-joes-api-556060884056.us-central1.run.app";
+  const API_BASE = "https://uncle-joes-api-556060884056.us-central1.run.app";
 
-    function groupByCategory(items) {
-      const grouped = {};
-      items.forEach(item => {
-        const category = item.category || "Other";
-        if (!grouped[category]) grouped[category] = [];
-        grouped[category].push(item);
-      });
-      return grouped;
+  // This helper is only needed for search results now, 
+  // since /menu/grouped does the work for us on initial load!
+  function groupByCategory(items) {
+    const grouped = {};
+    items.forEach(item => {
+      const category = item.category || "Other";
+      if (!grouped[category]) grouped[category] = [];
+      grouped[category].push(item);
+    });
+    return grouped;
+  }
+
+  async function loadMenu() {
+    const status = document.getElementById("status");
+    const container = document.getElementById("menuContainer");
+    const keyword = document.getElementById("searchInput").value.trim();
+
+    status.innerHTML = '<div class="loading">Loading menu...</div>';
+    container.innerHTML = "";
+
+    // 1. Updated the default URL to your new 'grouped' endpoint
+    let url = `${API_BASE}/menu/grouped`;
+    
+    // 2. Updated the search URL to match your backend path and parameter (?q=)
+    if (keyword) {
+      url = `${API_BASE}/menu/search/keyword?q=${encodeURIComponent(keyword)}`;
     }
 
-    async function loadMenu() {
-      const status = document.getElementById("status");
-      const container = document.getElementById("menuContainer");
-      const keyword = document.getElementById("searchInput").value.trim();
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to load menu data.");
+      const data = await response.json();
 
-      status.innerHTML = '<div class="loading">Loading menu...</div>';
-      container.innerHTML = "";
+      status.innerHTML = "";
 
-      let url = `${API_BASE}/menu`;
+      let grouped;
       if (keyword) {
-        url = `${API_BASE}/menu/search?item_name=${encodeURIComponent(keyword)}`;
-      }
-
-      try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error("Failed to load menu data.");
-        const data = await response.json();
-
-        status.innerHTML = "";
-
+        // Search results come back as a flat list, so we group them manually
         if (!data.length) {
           status.innerHTML = '<div class="empty">No menu items found.</div>';
           return;
         }
-
-        const grouped = groupByCategory(data);
-
-        Object.keys(grouped).sort().forEach(category => {
-          const section = document.createElement("section");
-          section.className = "category-section";
-
-          const heading = document.createElement("h3");
-          heading.className = "category-title";
-          heading.textContent = category;
-          section.appendChild(heading);
-
-          const grid = document.createElement("div");
-          grid.className = "grid";
-
-          grouped[category].forEach(item => {
-            const card = document.createElement("div");
-            card.className = "card";
-            card.innerHTML = `
-              <h3>${item.name}</h3>
-              <p><strong>Category:</strong> ${item.category}</p>
-              <p><strong>Size:</strong> ${item.size}</p>
-              <p><strong>Calories:</strong> ${item.calories}</p>
-              <p><strong>Price:</strong> $${Number(item.price).toFixed(2)}</p>
-              <p class="small"><strong>ID:</strong> ${item.id}</p>
-            `;
-            grid.appendChild(card);
-          });
-
-          section.appendChild(grid);
-          container.appendChild(section);
-        });
-      } catch (error) {
-        status.innerHTML = `<div class="error">${error.message}</div>`;
+        grouped = groupByCategory(data);
+      } else {
+        // Initial load comes back already grouped from the backend!
+        grouped = data;
       }
-    }
 
-    function resetMenu() {
-      document.getElementById("searchInput").value = "";
-      loadMenu();
-    }
+      // 3. Render the categories and items
+      Object.keys(grouped).sort().forEach(category => {
+        const section = document.createElement("section");
+        section.className = "category-section";
 
+        const heading = document.createElement("h3");
+        heading.className = "category-title";
+        heading.textContent = category;
+        section.appendChild(heading);
+
+        const grid = document.createElement("div");
+        grid.className = "grid";
+
+        grouped[category].forEach(item => {
+          const card = document.createElement("div");
+          card.className = "card";
+          card.innerHTML = `
+            <h3>${item.name}</h3>
+            <p><strong>Category:</strong> ${item.category}</p>
+            <p><strong>Size:</strong> ${item.size}</p>
+            <p><strong>Calories:</strong> ${item.calories}</p>
+            <p><strong>Price:</strong> $${Number(item.price).toFixed(2)}</p>
+            <p class="small"><strong>ID:</strong> ${item.id}</p>
+          `;
+          grid.appendChild(card);
+        });
+
+        section.appendChild(grid);
+        container.appendChild(section);
+      });
+    } catch (error) {
+      status.innerHTML = `<div class="error">${error.message}</div>`;
+    }
+  }
+
+  function resetMenu() {
+    document.getElementById("searchInput").value = "";
     loadMenu();
+  }
+
+  loadMenu();
   </script>
 </body>
 </html>
