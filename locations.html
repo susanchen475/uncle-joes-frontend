@@ -37,11 +37,14 @@
       const status = document.getElementById("status");
       const container = document.getElementById("locationsContainer");
       const stateField = document.getElementById("stateInput");
+      
       const searchTerm = stateField ? stateField.value.trim() : "";
+      const searchTermLower = searchTerm.toLowerCase();
 
       status.innerHTML = '<div class="loading">Searching locations...</div>';
       container.innerHTML = "";
 
+      // Calls the backend search endpoint
       let url = searchTerm 
         ? `${API_BASE}/locations/search?query_str=${encodeURIComponent(searchTerm)}`
         : `${API_BASE}/locations`;
@@ -50,25 +53,34 @@
         const response = await fetch(url);
         if (!response.ok) throw new Error("Could not reach the location database.");
         
-        currentLocations = await response.json(); 
+        let data = await response.json(); 
+
+        // --- SMART FILTER LOGIC ---
+        // If searching a 2-letter state code, filter out "accidental" matches 
+        // from other states that just happened to have those letters in the city name.
+        if (searchTerm.length === 2) {
+          data = data.filter(loc => loc.state && loc.state.toLowerCase() === searchTermLower);
+        }
+
         status.innerHTML = "";
 
-        if (currentLocations.length === 0) {
-          status.innerHTML = '<div class="error">No locations found. Try searching for a state like "IN".</div>';
+        if (data.length === 0) {
+          status.innerHTML = `<div class="error">No shops found exactly in "${searchTerm.toUpperCase()}".</div>`;
           return;
         }
 
-        currentLocations.forEach(loc => {
+        currentLocations = data; // Save to local cache for the hours popup
+
+        data.forEach(loc => {
           const card = document.createElement("div");
           card.className = "card";
           
-          // Schema names matched exactly to your BigQuery screenshot
           const wifiIcon = loc.wifi ? "✅ Wi-Fi" : "❌ No Wi-Fi";
           const driveThruIcon = loc.drive_thru ? "🚗 Drive-Thru" : "🚶 Walk-in Only";
           const doorDashIcon = loc.door_dash ? "🚲 DoorDash Available" : "🏠 In-store Only";
 
           card.innerHTML = `
-            <h3>${loc.city || 'Store'}, ${loc.state || ''}</h3>
+            <h3>${loc.city}, ${loc.state}</h3>
             <p><strong>Address:</strong><br>${loc.address_one || 'Address Pending'}</p>
             
             <div class="amenities-box" style="background: #f4f4f4; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 0.9em;">
@@ -94,7 +106,6 @@
       const formatTime = (time) => {
           if (time === null || time === undefined) return "Closed";
           const s = time.toString();
-          // Converts 800 to 8:00 and 2000 to 20:00
           return s.length <= 2 ? `0:${s.padStart(2, '0')}` : `${s.slice(0, -2)}:${s.slice(-2)}`;
       };
 
@@ -121,7 +132,7 @@ Sunday: ${formatTime(data.hours_sunday_open)} - ${formatTime(data.hours_sunday_c
       loadLocations();
     }
 
-    // Load initial locations when page opens
+    // Initial load when the page opens
     loadLocations();
   </script>
 </body>
