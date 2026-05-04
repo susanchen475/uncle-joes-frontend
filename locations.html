@@ -17,97 +17,112 @@
   </header>
 
   <main>
-    <h2>Locations</h2>
+    <h2>Our Locations</h2>
 
     <div class="card">
-      <input type="text" id="stateInput" placeholder="Filter by state (ex: IN)" />
+      <input type="text" id="stateInput" placeholder="Enter State (e.g. IN)" />
       <button onclick="loadLocations()">Search</button>
       <button onclick="resetLocations()">Reset</button>
-      <p class="small">Tip: enter a two-letter state abbreviation to narrow results.</p>
     </div>
 
     <div id="status"></div>
     <div id="locationsContainer" class="grid"></div>
   </main>
 
-<script>
-  const API_BASE = "https://uncle-joes-api-556060884056.us-central1.run.app";
+  <script>
+    const API_BASE = "https://uncle-joes-api-556060884056.us-central1.run.app";
+    let currentLocations = []; 
 
-  async function loadLocations() {
-    const status = document.getElementById("status");
-    const container = document.getElementById("locationsContainer");
-    const state = document.getElementById("stateInput").value.trim();
+    async function loadLocations() {
+      const status = document.getElementById("status");
+      const container = document.getElementById("locationsContainer");
+      const stateField = document.getElementById("stateInput");
+      const searchTerm = stateField ? stateField.value.trim() : "";
 
-    status.innerHTML = '<div class="loading">Searching locations...</div>';
-    container.innerHTML = "";
+      status.innerHTML = '<div class="loading">Searching locations...</div>';
+      container.innerHTML = "";
 
-    // 1. Corrected URL Path
-    let url = `${API_BASE}/locations/filter/state/${state || 'IN'}`;
+      let url = searchTerm 
+        ? `${API_BASE}/locations/search?query_str=${encodeURIComponent(searchTerm)}`
+        : `${API_BASE}/locations`;
 
-    try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Could not find locations for that state.");
-      const data = await response.json();
-
-      status.innerHTML = "";
-
-      data.forEach(loc => {
-        const card = document.createElement("div");
-        card.className = "card";
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Could not reach the location database.");
         
-        // 2. Corrected Amenities Mapping (Matches backend 'services' object)
-        const wifi = loc.services.free_wifi ? "✅ Wi-Fi" : "❌ No Wi-Fi";
-        const driveThru = loc.services.drive_thru ? "🚗 Drive-Thru" : "🚶 Walk-in Only";
-        const delivery = loc.services.doordash_available ? "🚲 DoorDash" : "🏠 In-store Only";
+        currentLocations = await response.json(); 
+        status.innerHTML = "";
 
-        card.innerHTML = `
-          <h3>${loc.city}</h3>
-          <p><strong>Address:</strong><br>${loc.address}</p>
+        if (currentLocations.length === 0) {
+          status.innerHTML = '<div class="error">No locations found. Try searching for a state like "IN".</div>';
+          return;
+        }
+
+        currentLocations.forEach(loc => {
+          const card = document.createElement("div");
+          card.className = "card";
           
-          <div class="amenities-box" style="background: #f4f4f4; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 0.9em;">
-            <p style="margin: 5px 0;">${wifi}</p>
-            <p style="margin: 5px 0;">${driveThru}</p>
-            <p style="margin: 5px 0;">${delivery}</p>
-          </div>
+          // Schema names matched exactly to your BigQuery screenshot
+          const wifiIcon = loc.wifi ? "✅ Wi-Fi" : "❌ No Wi-Fi";
+          const driveThruIcon = loc.drive_thru ? "🚗 Drive-Thru" : "🚶 Walk-in Only";
+          const doorDashIcon = loc.door_dash ? "🚲 DoorDash Available" : "🏠 In-store Only";
 
-          <button onclick="viewStoreDetails('${loc.id}')" style="width: 100%; padding: 10px; cursor: pointer;">View Hours & Contact</button>
-          <p class="small" style="margin-top: 10px;"><strong>Store ID:</strong> ${loc.id}</p>
-        `;
-        container.appendChild(card);
-      });
-    } catch (error) {
-      status.innerHTML = `<div class="error">${error.message}</div>`;
-    }
-  }
+          card.innerHTML = `
+            <h3>${loc.city || 'Store'}, ${loc.state || ''}</h3>
+            <p><strong>Address:</strong><br>${loc.address_one || 'Address Pending'}</p>
+            
+            <div class="amenities-box" style="background: #f4f4f4; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 0.9em;">
+              <p style="margin: 5px 0;">${wifiIcon}</p>
+              <p style="margin: 5px 0;">${driveThruIcon}</p>
+              <p style="margin: 5px 0;">${doorDashIcon}</p>
+            </div>
 
-  // 3. New Detail Function (Fetches formatted hours from the backend)
-  async function viewStoreDetails(locationId) {
-    try {
-      const response = await fetch(`${API_BASE}/locations/${locationId}`);
-      const data = await response.json();
-      
-      let hoursString = "";
-      for (const [day, time] of Object.entries(data.operating_hours)) {
-        hoursString += `${day}: ${time}\n`;
+            <button onclick="viewStoreDetails('${loc.id}')" style="width: 100%; padding: 10px; cursor: pointer;">View Hours & Contact</button>
+            <p class="small" style="margin-top: 10px;"><strong>Store ID:</strong> ${loc.id}</p>
+          `;
+          container.appendChild(card);
+        });
+      } catch (error) {
+        status.innerHTML = `<div class="error">${error.message}</div>`;
       }
+    }
+
+    function viewStoreDetails(locationId) {
+      const data = currentLocations.find(l => l.id === locationId);
+      if (!data) return;
+
+      const formatTime = (time) => {
+          if (time === null || time === undefined) return "Closed";
+          const s = time.toString();
+          // Converts 800 to 8:00 and 2000 to 20:00
+          return s.length <= 2 ? `0:${s.padStart(2, '0')}` : `${s.slice(0, -2)}:${s.slice(-2)}`;
+      };
+
+      const hours = `
+Monday: ${formatTime(data.hours_monday_open)} - ${formatTime(data.hours_monday_close)}
+Tuesday: ${formatTime(data.hours_tuesday_open)} - ${formatTime(data.hours_tuesday_close)}
+Wednesday: ${formatTime(data.hours_wednesday_open)} - ${formatTime(data.hours_wednesday_close)}
+Thursday: ${formatTime(data.hours_thursday_open)} - ${formatTime(data.hours_thursday_close)}
+Friday: ${formatTime(data.hours_friday_open)} - ${formatTime(data.hours_friday_close)}
+Saturday: ${formatTime(data.hours_saturday_open)} - ${formatTime(data.hours_saturday_close)}
+Sunday: ${formatTime(data.hours_sunday_open)} - ${formatTime(data.hours_sunday_close)}
+      `.trim();
 
       alert(
-        `Uncle Joe's - ${data.store_info.name}\n` +
-        `Phone: ${data.store_info.phone}\n` +
-        `Email: ${data.store_info.email}\n\n` +
-        `HOURS:\n${hoursString}`
+        `Uncle Joe's - ${data.city}\n` +
+        `Phone: ${data.phone_number || 'N/A'}\n\n` +
+        `HOURS:\n${hours}`
       );
-    } catch (error) {
-      alert("Error loading store details.");
     }
-  }
 
-  function resetLocations() {
-    document.getElementById("stateInput").value = "";
+    function resetLocations() {
+      const input = document.getElementById("stateInput");
+      if (input) input.value = "";
+      loadLocations();
+    }
+
+    // Load initial locations when page opens
     loadLocations();
-  }
-
-  loadLocations();
-</script>
+  </script>
 </body>
 </html>
