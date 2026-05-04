@@ -13,14 +13,15 @@
       <a href="index.html">Home</a>
       <a href="menu.html">Menu</a>
       <a href="locations.html">Locations</a>
+      <a href="login.html">Login</a>
     </nav>
   </header>
 
   <main>
-    <h2>Menu</h2>
+    <h2>Our Menu</h2>
 
     <div class="card">
-      <input type="text" id="searchInput" placeholder="Search menu items..." />
+      <input type="text" id="searchInput" placeholder="Search for coffee, snacks, or categories..." />
       <button onclick="loadMenu()">Search</button>
       <button onclick="resetMenu()">Reset</button>
     </div>
@@ -29,11 +30,14 @@
     <div id="menuContainer"></div>
   </main>
 
-  <script>
+<script>
+  // UPDATE THIS TO YOUR ACTUAL CLOUD RUN URL
   const API_BASE = "https://uncle-joes-api-556060884056.us-central1.run.app";
 
-  // This helper is only needed for search results now, 
-  // since /menu/grouped does the work for us on initial load!
+  /**
+   * Helper: Groups a flat list of items by their category.
+   * Your backend search returns a flat list [], so we use this to organize it.
+   */
   function groupByCategory(items) {
     const grouped = {};
     items.forEach(item => {
@@ -49,44 +53,43 @@
     const container = document.getElementById("menuContainer");
     const keyword = document.getElementById("searchInput").value.trim();
 
-    status.innerHTML = '<div class="loading">Loading menu...</div>';
+    status.innerHTML = '<div class="loading">Fetching latest menu...</div>';
     container.innerHTML = "";
 
-    // 1. Updated the default URL to your new 'grouped' endpoint
-    let url = `${API_BASE}/menu/grouped`;
-    
-    // 2. Updated the search URL to match your backend path and parameter (?q=)
-    if (keyword) {
-      url = `${API_BASE}/menu/search/keyword?q=${encodeURIComponent(keyword)}`;
-    }
+    // 1. Logic Switch: 
+    // If searching, use /menu/search/keyword. If not, use /menu/grouped.
+    let url = keyword 
+      ? `${API_BASE}/menu/search/keyword?q=${encodeURIComponent(keyword)}` 
+      : `${API_BASE}/menu/grouped`;
 
     try {
       const response = await fetch(url);
-      if (!response.ok) throw new Error("Failed to load menu data.");
+      if (!response.ok) throw new Error("Could not retrieve menu data.");
       const data = await response.json();
 
       status.innerHTML = "";
 
       let grouped;
       if (keyword) {
-        // Search results come back as a flat list, so we group them manually
-        if (!data.length) {
-          status.innerHTML = '<div class="empty">No menu items found.</div>';
+        // Search returns a LIST [], so we must group it on the frontend
+        if (!data || data.length === 0) {
+          status.innerHTML = '<div class="empty">No items match your search.</div>';
           return;
         }
         grouped = groupByCategory(data);
       } else {
-        // Initial load comes back already grouped from the backend!
+        // Initial load returns an OBJECT {} already grouped by the backend
         grouped = data;
       }
 
-      // 3. Render the categories and items
+      // 2. Rendering logic
       Object.keys(grouped).sort().forEach(category => {
         const section = document.createElement("section");
         section.className = "category-section";
 
         const heading = document.createElement("h3");
         heading.className = "category-title";
+        heading.style = "border-bottom: 2px solid #6F4E37; color: #6F4E37; padding-bottom: 5px; margin-top: 30px;";
         heading.textContent = category;
         section.appendChild(heading);
 
@@ -95,14 +98,17 @@
 
         grouped[category].forEach(item => {
           const card = document.createElement("div");
-          card.className = "card";
+          card.className = "card menu-card";
+          
+          // Using 'name' (not item_name) to match your backend SELECT
           card.innerHTML = `
-            <h3>${item.name}</h3>
-            <p><strong>Category:</strong> ${item.category}</p>
-            <p><strong>Size:</strong> ${item.size}</p>
-            <p><strong>Calories:</strong> ${item.calories}</p>
-            <p><strong>Price:</strong> $${Number(item.price).toFixed(2)}</p>
-            <p class="small"><strong>ID:</strong> ${item.id}</p>
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <h4 style="margin: 0;">${item.name}</h4>
+                <span class="price" style="font-weight: bold; color: #6F4E37;">$${Number(item.price).toFixed(2)}</span>
+            </div>
+            <p style="margin: 5px 0; font-size: 0.9em;"><strong>Size:</strong> ${item.size || 'Regular'}</p>
+            <p style="margin: 5px 0; font-size: 0.9em;"><strong>Calories:</strong> ${item.calories || 'N/A'}</p>
+            <p class="small" style="font-size: 0.7em; color: #888; margin-top: 10px;">Item ID: ${item.id}</p>
           `;
           grid.appendChild(card);
         });
@@ -111,7 +117,7 @@
         container.appendChild(section);
       });
     } catch (error) {
-      status.innerHTML = `<div class="error">${error.message}</div>`;
+      status.innerHTML = `<div class="error">Error: ${error.message}</div>`;
     }
   }
 
@@ -120,5 +126,8 @@
     loadMenu();
   }
 
+  // Load the menu as soon as the page opens
   loadMenu();
 </script>
+</body>
+</html>
