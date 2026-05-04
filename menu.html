@@ -21,7 +21,7 @@
     <h2>Our Menu</h2>
 
     <div class="card">
-      <input type="text" id="searchInput" placeholder="Search for coffee, snacks, or categories..." />
+      <input type="text" id="searchInput" placeholder="Search menu items..." />
       <button onclick="loadMenu()">Search</button>
       <button onclick="resetMenu()">Reset</button>
     </div>
@@ -31,13 +31,8 @@
   </main>
 
 <script>
-  // UPDATE THIS TO YOUR ACTUAL CLOUD RUN URL
   const API_BASE = "https://uncle-joes-api-556060884056.us-central1.run.app";
 
-  /**
-   * Helper: Groups a flat list of items by their category.
-   * Your backend search returns a flat list [], so we use this to organize it.
-   */
   function groupByCategory(items) {
     const grouped = {};
     items.forEach(item => {
@@ -56,8 +51,6 @@
     status.innerHTML = '<div class="loading">Fetching latest menu...</div>';
     container.innerHTML = "";
 
-    // 1. Logic Switch: 
-    // If searching, use /menu/search/keyword. If not, use /menu/grouped.
     let url = keyword 
       ? `${API_BASE}/menu/search/keyword?q=${encodeURIComponent(keyword)}` 
       : `${API_BASE}/menu/grouped`;
@@ -67,22 +60,27 @@
       if (!response.ok) throw new Error("Could not retrieve menu data.");
       const data = await response.json();
 
+      // DEBUG: Look for this in your F12 Console!
+      console.log("Data received from API:", data);
+
       status.innerHTML = "";
 
       let grouped;
       if (keyword) {
-        // Search returns a LIST [], so we must group it on the frontend
         if (!data || data.length === 0) {
           status.innerHTML = '<div class="empty">No items match your search.</div>';
           return;
         }
         grouped = groupByCategory(data);
       } else {
-        // Initial load returns an OBJECT {} already grouped by the backend
         grouped = data;
       }
 
-      // 2. Rendering logic
+      if (!grouped || Object.keys(grouped).length === 0) {
+        status.innerHTML = "No items found in the database.";
+        return;
+      }
+
       Object.keys(grouped).sort().forEach(category => {
         const section = document.createElement("section");
         section.className = "category-section";
@@ -99,8 +97,6 @@
         grouped[category].forEach(item => {
           const card = document.createElement("div");
           card.className = "card menu-card";
-          
-          // Using 'name' (not item_name) to match your backend SELECT
           card.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: start;">
                 <h4 style="margin: 0;">${item.name}</h4>
@@ -117,6 +113,7 @@
         container.appendChild(section);
       });
     } catch (error) {
+      console.error("Connection Error:", error);
       status.innerHTML = `<div class="error">Error: ${error.message}</div>`;
     }
   }
@@ -126,8 +123,7 @@
     loadMenu();
   }
 
-  // Load the menu as soon as the page opens
-  loadMenu();
+  loadMenu(); // Initial call
 </script>
 </body>
 </html>
