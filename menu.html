@@ -13,12 +13,11 @@
       <a href="index.html">Home</a>
       <a href="menu.html">Menu</a>
       <a href="locations.html">Locations</a>
-      <a href="login.html">Login</a>
     </nav>
   </header>
 
   <main>
-    <h2>Our Menu</h2>
+    <h2>Menu</h2>
 
     <div class="card">
       <input type="text" id="searchInput" placeholder="Search menu items..." />
@@ -30,100 +29,86 @@
     <div id="menuContainer"></div>
   </main>
 
-<script>
-  const API_BASE = "https://uncle-joes-api-556060884056.us-central1.run.app";
+  <script>
+    const API_BASE = "https://uncle-joes-api-556060884056.us-central1.run.app";
 
-  function groupByCategory(items) {
-    const grouped = {};
-    items.forEach(item => {
-      const category = item.category || "Other";
-      if (!grouped[category]) grouped[category] = [];
-      grouped[category].push(item);
-    });
-    return grouped;
-  }
+    function groupByCategory(items) {
+      const grouped = {};
+      items.forEach(item => {
+        const category = item.category || "Other";
+        if (!grouped[category]) grouped[category] = [];
+        grouped[category].push(item);
+      });
+      return grouped;
+    }
 
-  async function loadMenu() {
-    const status = document.getElementById("status");
-    const container = document.getElementById("menuContainer");
-    const keyword = document.getElementById("searchInput").value.trim();
+    async function loadMenu() {
+      const status = document.getElementById("status");
+      const container = document.getElementById("menuContainer");
+      const keyword = document.getElementById("searchInput").value.trim();
 
-    status.innerHTML = '<div class="loading">Fetching latest menu...</div>';
-    container.innerHTML = "";
+      status.innerHTML = '<div class="loading">Loading menu...</div>';
+      container.innerHTML = "";
 
-    let url = keyword 
-      ? `${API_BASE}/menu/search/keyword?q=${encodeURIComponent(keyword)}` 
-      : `${API_BASE}/menu/grouped`;
-
-    try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Could not retrieve menu data.");
-      const data = await response.json();
-
-      // DEBUG: Look for this in your F12 Console!
-      console.log("Data received from API:", data);
-
-      status.innerHTML = "";
-
-      let grouped;
+      let url = `${API_BASE}/menu`;
       if (keyword) {
-        if (!data || data.length === 0) {
-          status.innerHTML = '<div class="empty">No items match your search.</div>';
+        url = `${API_BASE}/menu/search?item_name=${encodeURIComponent(keyword)}`;
+      }
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Failed to load menu data.");
+        const data = await response.json();
+
+        status.innerHTML = "";
+
+        if (!data.length) {
+          status.innerHTML = '<div class="empty">No menu items found.</div>';
           return;
         }
-        grouped = groupByCategory(data);
-      } else {
-        grouped = data;
-      }
 
-      if (!grouped || Object.keys(grouped).length === 0) {
-        status.innerHTML = "No items found in the database.";
-        return;
-      }
+        const grouped = groupByCategory(data);
 
-      Object.keys(grouped).sort().forEach(category => {
-        const section = document.createElement("section");
-        section.className = "category-section";
+        Object.keys(grouped).sort().forEach(category => {
+          const section = document.createElement("section");
+          section.className = "category-section";
 
-        const heading = document.createElement("h3");
-        heading.className = "category-title";
-        heading.style = "border-bottom: 2px solid #6F4E37; color: #6F4E37; padding-bottom: 5px; margin-top: 30px;";
-        heading.textContent = category;
-        section.appendChild(heading);
+          const heading = document.createElement("h3");
+          heading.className = "category-title";
+          heading.textContent = category;
+          section.appendChild(heading);
 
-        const grid = document.createElement("div");
-        grid.className = "grid";
+          const grid = document.createElement("div");
+          grid.className = "grid";
 
-        grouped[category].forEach(item => {
-          const card = document.createElement("div");
-          card.className = "card menu-card";
-          card.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: start;">
-                <h4 style="margin: 0;">${item.name}</h4>
-                <span class="price" style="font-weight: bold; color: #6F4E37;">$${Number(item.price).toFixed(2)}</span>
-            </div>
-            <p style="margin: 5px 0; font-size: 0.9em;"><strong>Size:</strong> ${item.size || 'Regular'}</p>
-            <p style="margin: 5px 0; font-size: 0.9em;"><strong>Calories:</strong> ${item.calories || 'N/A'}</p>
-            <p class="small" style="font-size: 0.7em; color: #888; margin-top: 10px;">Item ID: ${item.id}</p>
-          `;
-          grid.appendChild(card);
+          grouped[category].forEach(item => {
+            const card = document.createElement("div");
+            card.className = "card";
+            card.innerHTML = `
+              <h3>${item.name}</h3>
+              <p><strong>Category:</strong> ${item.category}</p>
+              <p><strong>Size:</strong> ${item.size}</p>
+              <p><strong>Calories:</strong> ${item.calories}</p>
+              <p><strong>Price:</strong> $${Number(item.price).toFixed(2)}</p>
+              <p class="small"><strong>ID:</strong> ${item.id}</p>
+            `;
+            grid.appendChild(card);
+          });
+
+          section.appendChild(grid);
+          container.appendChild(section);
         });
-
-        section.appendChild(grid);
-        container.appendChild(section);
-      });
-    } catch (error) {
-      console.error("Connection Error:", error);
-      status.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+      } catch (error) {
+        status.innerHTML = `<div class="error">${error.message}</div>`;
+      }
     }
-  }
 
-  function resetMenu() {
-    document.getElementById("searchInput").value = "";
+    function resetMenu() {
+      document.getElementById("searchInput").value = "";
+      loadMenu();
+    }
+
     loadMenu();
-  }
-
-  loadMenu(); // Initial call
-</script>
+  </script>
 </body>
 </html>
